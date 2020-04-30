@@ -1,67 +1,147 @@
-import * as React from 'react';
-import { Platform, StatusBar, StyleSheet, View } from 'react-native';
-import { SplashScreen } from 'expo';
-import * as Font from 'expo-font';
-import { Ionicons } from '@expo/vector-icons';
+/**
+ * Sample React Native App
+ * https://github.com/facebook/react-native
+ *
+ * @format
+ * @flow
+ */
+
+import React, { useEffect } from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createDrawerNavigator } from '@react-navigation/drawer';
 
-import BottomTabNavigator from './navigation/BottomTabNavigator';
-import useLinking from './navigation/useLinking';
+import { DrawerContent } from './screens/DrawerContent';
 
-const Stack = createStackNavigator();
+import MainTabScreen from './screens/MainTabScreen';
+import SupportScreen from './screens/SupportScreen';
+import SettingsScreen from './screens/SettingsScreen';
+import BookmarkScreen from './screens/BookmarkScreen';
 
-export default function App(props) {
-  const [isLoadingComplete, setLoadingComplete] = React.useState(false);
-  const [initialNavigationState, setInitialNavigationState] = React.useState();
-  const containerRef = React.useRef();
-  const { getInitialState } = useLinking(containerRef);
+import { AuthContext } from './components/context';
 
-  // Load any resources or data that we need prior to rendering the app
-  React.useEffect(() => {
-    async function loadResourcesAndDataAsync() {
-      try {
-        SplashScreen.preventAutoHide();
+import RootStackScreen from './screens/RootStackScreen';
 
-        // Load our initial navigation state
-        setInitialNavigationState(await getInitialState());
+// import AsyncStorage from '@react-native-community/async-storage';
+import { AsyncStorage } from 'react-native';
 
-        // Load fonts
-        await Font.loadAsync({
-          ...Ionicons.font,
-          'space-mono': require('./assets/fonts/SpaceMono-Regular.ttf'),
-        });
-      } catch (e) {
-        // We might want to provide this error information to an error reporting service
-        console.warn(e);
-      } finally {
-        setLoadingComplete(true);
-        SplashScreen.hide();
-      }
+
+const Drawer = createDrawerNavigator();
+
+const App = () => {
+  // const [isLoading, setIsLoading] = React.useState(true);
+  // const [userToken, setUserToken] = React.useState(null); 
+
+  const initialLoginState = {
+    isLoading: true,
+    userName: null,
+    userToken: null,
+  };
+
+  const loginReducer = (prevState, action) => {
+    switch( action.type ) {
+      case 'RETRIEVE_TOKEN': 
+        return {
+          ...prevState,
+          userToken: action.token,
+          isLoading: false,
+        };
+      case 'LOGIN': 
+        return {
+          ...prevState,
+          userName: action.id,
+          userToken: action.token,
+          isLoading: false,
+        };
+      case 'LOGOUT': 
+        return {
+          ...prevState,
+          userName: null,
+          userToken: null,
+          isLoading: false,
+        };
+      case 'REGISTER': 
+        return {
+          ...prevState,
+          userName: action.id,
+          userToken: action.token,
+          isLoading: false,
+        };
     }
+  };
 
-    loadResourcesAndDataAsync();
+  const [loginState, dispatch] = React.useReducer(loginReducer, initialLoginState);
+
+  const authContext = React.useMemo(() => ({
+    signIn: async(foundUser) => {
+      // setUserToken('fgkj');
+      // setIsLoading(false);
+      const userToken = String(foundUser[0].userToken);
+      const userName = foundUser[0].username;
+      
+      try {
+        await AsyncStorage.setItem('userToken', userToken);
+      } catch(e) {
+        console.log(e);
+      }
+      // console.log('user token: ', userToken);
+      dispatch({ type: 'LOGIN', id: userName, token: userToken });
+    },
+    signOut: async() => {
+      // setUserToken(null);
+      // setIsLoading(false);
+      try {
+        await AsyncStorage.removeItem('userToken');
+      } catch(e) {
+        console.log(e);
+      }
+      dispatch({ type: 'LOGOUT' });
+    },
+    signUp: () => {
+      // setUserToken('fgkj');
+      // setIsLoading(false);
+    },
+  }), []);
+
+  useEffect(() => {
+    setTimeout(async() => {
+      // setIsLoading(false);
+      let userToken;
+      userToken = null;
+      try {
+        userToken = await AsyncStorage.getItem('userToken');
+      } catch(e) {
+        console.log(e);
+      }
+      // console.log('user token: ', userToken);
+      dispatch({ type: 'RETRIEVE_TOKEN', token: userToken });
+    }, 1000);
   }, []);
 
-  if (!isLoadingComplete && !props.skipLoadingScreen) {
-    return null;
-  } else {
-    return (
-      <View style={styles.container}>
-        {Platform.OS === 'ios' && <StatusBar barStyle="default" />}
-        <NavigationContainer ref={containerRef} initialState={initialNavigationState}>
-          <Stack.Navigator>
-            <Stack.Screen name="Root" component={BottomTabNavigator} />
-          </Stack.Navigator>
-        </NavigationContainer>
+  if( loginState.isLoading ) {
+    return(
+      <View style={{flex:1,justifyContent:'center',alignItems:'center'}}>
+        <ActivityIndicator size="large"/>
       </View>
     );
   }
+  return (
+    <AuthContext.Provider value={authContext}>
+    <NavigationContainer>
+      { loginState.userToken !== null ? (
+        <Drawer.Navigator drawerContent={props => <DrawerContent {...props} />}>
+          <Drawer.Screen name="HomeDrawer" component={MainTabScreen} />
+          <Drawer.Screen name="SupportScreen" component={SupportScreen} />
+          <Drawer.Screen name="SettingsScreen" component={SettingsScreen} />
+          <Drawer.Screen name="BookmarkScreen" component={BookmarkScreen} />
+        </Drawer.Navigator>
+      )
+    :
+      <RootStackScreen/>
+    }
+    </NavigationContainer>
+    </AuthContext.Provider>
+  );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-});
+export default App;

@@ -2,7 +2,7 @@ import React from 'react'
 import { Button, StyleSheet, Text, View } from 'react-native';
 import { Stitch, AnonymousCredential } from 'mongodb-stitch-react-native-sdk';
  
-export default class Auth extends React.Component {
+class Auth extends React.Component {
   constructor(props) {
     super(props);
     this.state={
@@ -80,3 +80,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
+
+export default Auth();
